@@ -23,7 +23,7 @@ app.use(cors(corsOptions));
 
 app.use(express.json({ limit: "150mb" }))
 
-app.use("/api/v1/openai", openaiRoutes);
+app.use("/api/v1/", openaiRoutes);
 app.use('/api/user', userRoutes); // Add user routes
 
 app.get('/', (req, res) => {
