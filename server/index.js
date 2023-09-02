@@ -8,22 +8,11 @@ import userRoutes from './user.routes.js'; // Import user routes using ES6 impor
 dotenv.config();
 
 const app = express();
-const allowedOrigins = ['http://localhost:5173', 'https://kash1.onrender.com'];
-
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (allowedOrigins.includes(origin) || !origin) { // !origin allows requests from tools like Postman
-      callback(null, true)
-    } else {
-      callback(new Error('Not allowed by CORS'))
-    }
-  }
-};
-app.use(cors(corsOptions));
-
+const allowedOrigins = ['http://localhost:5173',]; 
+app.use(cors());
 app.use(express.json({ limit: "150mb" }))
 
-app.use("/api/v1/", openaiRoutes);
+app.use("/api/v1/dalle", dalleRoutes);
 app.use('/api/user', userRoutes); // Add user routes
 
 app.get('/', (req, res) => {
