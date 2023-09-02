@@ -39,10 +39,11 @@ router.post('/chatbot', async (req, res) => {
   try {
     const { message } = req.body;
     
-    const response = await openai.complete({
-      prompt: message,
-      max_tokens: 150
-    });
+    const response = await openai.createCompletion({
+        prompt: message,
+        max_tokens: 150
+      });
+      
 
     const chatbotResponse = response.data.choices[0].text.trim();
 
