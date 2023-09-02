@@ -2,7 +2,7 @@ import express from 'express';
 import * as dotenv from 'dotenv';
 import cors from 'cors';
 
-import openaiRoutes from './routes/openai.routes.js';
+import dalleRoutes from './routes/dalle.routes.js';
 import userRoutes from './user.routes.js'; // Import user routes using ES6 import syntax
 
 dotenv.config();
