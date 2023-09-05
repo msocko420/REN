@@ -35,5 +35,22 @@ router.route('/').post(async (req, res) => {
     res.status(500).json({ message: "Something went wrong" })
   }
 })
+router.post('/chatbot', async (req, res) => {
+  try {
+    const { message } = req.body;
+    
+    const response = await openai.createCompletion({
+      model: "text-davinci-003",
+      prompt: message,
+      max_tokens: 150
+    });
+    
+    const chatbotResponse = response.data.choices[0].text.trim();
 
+    res.status(200).json({ message: chatbotResponse });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Something went wrong" });
+  }
+});
 export default router;
