@@ -138,7 +138,7 @@ const Render3D = () => {
     }
 
     try {
-      const response = await axios.post('http://192.168.1.194:8000/render/obj', formData, {
+      const response = await axios.post('https://0c37-2603-9001-3d01-3941-c8bf-663-fc5-fcd6.ngrok-free.app ', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
