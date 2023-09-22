@@ -6,9 +6,10 @@ import Stripe from 'stripe';
 import jwt from 'jsonwebtoken';
 
 const router = express.Router();
-const SECRET_KEY = 'YOUR_SECRET_KEY';
+const SECRET_KEY = process.env.JWT_SECRET;
 
-const stripe = new Stripe('YOUR_ACTUAL_SECRET_KEY_FROM_STRIPE');
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const authenticateJWT = (req, res, next) => {
     const authHeader = req.headers.authorization;
