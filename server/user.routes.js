@@ -8,7 +8,6 @@ import jwt from 'jsonwebtoken';
 const router = express.Router();
 const SECRET_KEY = process.env.JWT_SECRET;
 
-
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const authenticateJWT = (req, res, next) => {
@@ -99,20 +98,6 @@ router.post('/login', [
     });
 });
 
-router.post('/charge', authenticateJWT, async (req, res) => {
-    try {
-        const { tokenId, amount } = req.body;
-        const charge = await stripe.charges.create({
-            amount: amount,
-            currency: 'usd',
-            description: 'Charge for subscription',
-            source: tokenId,
-        });
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
 router.put('/account/update', authenticateJWT, (req, res) => {
     const { username, email } = req.body;
     const user = req.user;
@@ -137,16 +122,108 @@ router.post('/webhook', express.raw({ type: 'application/json' }), (req, res) =>
     let event;
 
     try {
-        event = stripe.webhooks.constructEvent(req.body, sig, 'YOUR_ACTUAL_WEBHOOK_SECRET_FROM_STRIPE');
+        event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
     } catch (err) {
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
     switch (event.type) {
-        case 'payment_intent.succeeded':
-            const paymentIntent = event.data.object;
-            console.log('PaymentIntent was successful!');
+        case 'checkout.session.completed':
+            const session = event.data.object;
+            const customerId = session.customer;
+            const subscriptionId = session.subscription;
+            const username = session.client_reference_id;
+
+            const startDate = new Date();
+            const endDate = new Date(startDate);
+            endDate.setMonth(endDate.getMonth() + 1);
+
+            pool.query('UPDATE users SET stripe_customer_id = ?, stripe_subscription_id = ?, subscription_status = "active", subscription_start_date = ?, subscription_end_date = ? WHERE username = ?', 
+                [customerId, subscriptionId, startDate, endDate, username], 
+                (error) => {
+                    if (error) {
+                        console.error("Error updating user after successful checkout:", error.message);
+                    }
+                });
+
+            // You can add a record to the `payments` table here.
             break;
+
+        case 'customer.subscription.deleted':
+            const deletedSubscription = event.data.object;
+            const userFromDeletedSubscription = deletedSubscription.client_reference_id;
+
+            pool.query('UPDATE users SET subscription_status = "inactive" WHERE username = ?', 
+                [userFromDeletedSubscription], 
+                (error) => {
+                    if (error) {
+                        console.error("Error updating user subscription:", error.message);
+                    }
+                });
+            break;
+
+        case 'invoice.payment_failed':
+            const failedInvoice = event.data.object;
+            const userFromFailedInvoice = failedInvoice.client_reference_id;
+
+            pool.query('UPDATE users SET subscription_status = "payment_failed" WHERE username = ?', 
+                [userFromFailedInvoice], 
+                (error) => {
+                    if (error) {
+                        console.error("Error updating user payment status:", error.message);
+                    }
+                });
+
+            pool.query('INSERT INTO payments (user_id, payment_amount, payment_date, payment_status) VALUES (?, ?, ?, "FAILED")', 
+                [userFromFailedInvoice, failedInvoice.amount_due, new Date(failedInvoice.created * 1000)],
+                (error) => {
+                    if (error) {
+                        console.error("Error adding failed payment record:", error.message);
+                    }
+                });
+
+            console.log('Payment failed for invoice', failedInvoice.id);
+            break;
+
+        case 'invoice.payment_succeeded':
+            const successfulInvoice = event.data.object;
+            const userFromSuccessfulInvoice = successfulInvoice.client_reference_id;
+
+            pool.query('UPDATE users SET subscription_status = "active" WHERE username = ?', 
+                [userFromSuccessfulInvoice], 
+                (error) => {
+                    if (error) {
+                        console.error("Error updating user payment status:", error.message);
+                    }
+                });
+
+            pool.query('INSERT INTO payments (user_id, payment_amount, payment_date, payment_status) VALUES (?, ?, ?, "SUCCESS")', 
+                [userFromSuccessfulInvoice, successfulInvoice.amount_paid, new Date(successfulInvoice.created * 1000)],
+                (error) => {
+                    if (error) {
+                        console.error("Error adding successful payment record:", error.message);
+                    }
+                });
+
+            console.log('Payment successful for invoice', successfulInvoice.id);
+            break;
+
+        case 'customer.subscription.updated':
+            const updatedSubscription = event.data.object;
+            const userFromUpdatedSubscription = updatedSubscription.client_reference_id;
+            const newStatus = updatedSubscription.status;
+
+            pool.query('UPDATE users SET subscription_status = ? WHERE username = ?', 
+                [newStatus, userFromUpdatedSubscription], 
+                (error) => {
+                    if (error) {
+                        console.error("Error updating user subscription status:", error.message);
+                    }
+                });
+            break;
+
+        // Add any additional webhook events that you need to handle
+    
         default:
             return res.status(400).end();
     }
