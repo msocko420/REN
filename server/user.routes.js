@@ -31,7 +31,7 @@ const authenticateJWT = (req, res, next) => {
 
 router.get('/account/:username', authenticateJWT, (req, res) => {
     const { username } = req.params;
-
+    console.log("Received username in /account/:username route:", username);
     pool.query('SELECT users.*, subscription_plans.plan_name, subscription_plans.cost, subscription_plans.duration FROM users LEFT JOIN subscription_plans ON users.subscription_plan_id = subscription_plans.id WHERE users.username = ?', [username], (error, results) => {
         if (error) {
             return res.status(500).send({ error: error.message });
