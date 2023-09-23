@@ -40,6 +40,7 @@ router.get('/account/:username', authenticateJWT, (req, res) => {
             return res.status(404).send({ error: 'User not found' });
         }
         const user = results[0];
+        console.log(user);  // Log the user data
         delete user.password;
         res.status(200).send({ user });
     });
