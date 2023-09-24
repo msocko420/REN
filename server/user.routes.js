@@ -7,7 +7,6 @@ import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 const SECRET_KEY = process.env.JWT_SECRET;
-
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const authenticateJWT = (req, res, next) => {
@@ -29,7 +28,7 @@ const authenticateJWT = (req, res, next) => {
     }
 };
 
-router.get('/account/:username', authenticateJWT, (req, res) => {
+router.get('/account/:username', express.json(), authenticateJWT, (req, res) => {
     const { username } = req.params;
     console.log("Received username in /account/:username route:", username);
     pool.query('SELECT users.*, subscription_plans.plan_name, subscription_plans.cost, subscription_plans.duration FROM users LEFT JOIN subscription_plans ON users.subscription_plan_id = subscription_plans.id WHERE users.username = ?', [username], (error, results) => {
@@ -46,7 +45,7 @@ router.get('/account/:username', authenticateJWT, (req, res) => {
     });
 });
 
-router.post('/signup', [
+router.post('/signup', express.json(), [
     body('username').isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
     body('email').isEmail().withMessage('Invalid email address'),
     body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
@@ -70,7 +69,7 @@ router.post('/signup', [
     });
 });
 
-router.post('/login', [
+router.post('/login', express.json(), [
     body('username').notEmpty().withMessage('Username is required'),
     body('password').notEmpty().withMessage('Password is required'),
 ], (req, res) => {
@@ -99,7 +98,7 @@ router.post('/login', [
     });
 });
 
-router.put('/account/update', authenticateJWT, (req, res) => {
+router.put('/account/update', express.json(), authenticateJWT, (req, res) => {
     const { username, email } = req.body;
     const user = req.user;
 
