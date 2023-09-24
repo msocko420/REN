@@ -118,118 +118,58 @@ router.put('/account/update', authenticateJWT, (req, res) => {
     });
 });
 
-router.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
-    const sig = req.headers['stripe-signature'];
+router.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
     let event;
 
     try {
-        event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+        // Parse the incoming event payload from Stripe
+        event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
     } catch (err) {
+        console.error(`Failed to validate Stripe webhook signature: ${err.message}`);
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    switch (event.type) {
-        case 'checkout.session.completed':
-            const session = event.data.object;
-            const customerId = session.customer;
-            const subscriptionId = session.subscription;
-            const username = session.client_reference_id;
+    // Handle the event type (e.g., a successful payment)
+    if (event.type === 'checkout.session.completed') {
+        const session = event.data.object;
 
-            const startDate = new Date();
-            const endDate = new Date(startDate);
-            endDate.setMonth(endDate.getMonth() + 1);
+        // Extracting user's ID from the Stripe session's metadata
+        const userId = session.metadata.userId;
 
-            pool.query('UPDATE users SET stripe_customer_id = ?, stripe_subscription_id = ?, subscription_status = "active", subscription_start_date = ?, subscription_end_date = ? WHERE username = ?', 
-                [customerId, subscriptionId, startDate, endDate, username], 
-                (error) => {
-                    if (error) {
-                        console.error("Error updating user after successful checkout:", error.message);
-                    }
-                });
+        // Update the user's subscription details in the database
+        const subscriptionStatus = 'ACTIVE';
+        const startDate = new Date();
+        // For simplicity, assuming the user always picks the monthly plan. This should be adjusted based on your actual logic
+        const endDate = new Date();
+        endDate.setMonth(endDate.getMonth() + 1);
 
-            // You can add a record to the `payments` table here.
-            break;
+        pool.query('UPDATE users SET subscription_status = ?, subscription_start_date = ?, subscription_end_date = ? WHERE id = ?',
+            [subscriptionStatus, startDate, endDate, userId], (error, results) => {
+                if (error) {
+                    console.error("Failed to update user subscription in the database:", error);
+                    return res.status(500).send("Database Error");
+                }
 
-        case 'customer.subscription.deleted':
-            const deletedSubscription = event.data.object;
-            const userFromDeletedSubscription = deletedSubscription.client_reference_id;
+                // Log the payment in the Payments table
+                const paymentAmount = session.amount_total / 100; // Convert to dollars from cents
+                const paymentDate = new Date(session.created * 1000); // Convert Stripe's timestamp to JavaScript Date
+                const paymentStatus = 'SUCCESS'; // Or adjust based on your design
+                const planId = session.metadata.planId; // Assuming you also pass the plan ID in the session's metadata
 
-            pool.query('UPDATE users SET subscription_status = "inactive" WHERE username = ?', 
-                [userFromDeletedSubscription], 
-                (error) => {
-                    if (error) {
-                        console.error("Error updating user subscription:", error.message);
-                    }
-                });
-            break;
+                pool.query('INSERT INTO payments (user_id, subscription_plan_id, payment_amount, payment_date, payment_status) VALUES (?, ?, ?, ?, ?)',
+                    [userId, planId, paymentAmount, paymentDate, paymentStatus], (err, results) => {
+                        if (err) {
+                            console.error("Failed to log payment in the database:", err);
+                            return res.status(500).send("Database Error");
+                        }
 
-        case 'invoice.payment_failed':
-            const failedInvoice = event.data.object;
-            const userFromFailedInvoice = failedInvoice.client_reference_id;
-
-            pool.query('UPDATE users SET subscription_status = "payment_failed" WHERE username = ?', 
-                [userFromFailedInvoice], 
-                (error) => {
-                    if (error) {
-                        console.error("Error updating user payment status:", error.message);
-                    }
-                });
-
-            pool.query('INSERT INTO payments (user_id, payment_amount, payment_date, payment_status) VALUES (?, ?, ?, "FAILED")', 
-                [userFromFailedInvoice, failedInvoice.amount_due, new Date(failedInvoice.created * 1000)],
-                (error) => {
-                    if (error) {
-                        console.error("Error adding failed payment record:", error.message);
-                    }
-                });
-
-            console.log('Payment failed for invoice', failedInvoice.id);
-            break;
-
-        case 'invoice.payment_succeeded':
-            const successfulInvoice = event.data.object;
-            const userFromSuccessfulInvoice = successfulInvoice.client_reference_id;
-
-            pool.query('UPDATE users SET subscription_status = "active" WHERE username = ?', 
-                [userFromSuccessfulInvoice], 
-                (error) => {
-                    if (error) {
-                        console.error("Error updating user payment status:", error.message);
-                    }
-                });
-
-            pool.query('INSERT INTO payments (user_id, payment_amount, payment_date, payment_status) VALUES (?, ?, ?, "SUCCESS")', 
-                [userFromSuccessfulInvoice, successfulInvoice.amount_paid, new Date(successfulInvoice.created * 1000)],
-                (error) => {
-                    if (error) {
-                        console.error("Error adding successful payment record:", error.message);
-                    }
-                });
-
-            console.log('Payment successful for invoice', successfulInvoice.id);
-            break;
-
-        case 'customer.subscription.updated':
-            const updatedSubscription = event.data.object;
-            const userFromUpdatedSubscription = updatedSubscription.client_reference_id;
-            const newStatus = updatedSubscription.status;
-
-            pool.query('UPDATE users SET subscription_status = ? WHERE username = ?', 
-                [newStatus, userFromUpdatedSubscription], 
-                (error) => {
-                    if (error) {
-                        console.error("Error updating user subscription status:", error.message);
-                    }
-                });
-            break;
-
-        // Add any additional webhook events that you need to handle
-    
-        default:
-            return res.status(400).end();
+                        return res.json({ received: true });
+                    });
+            });
+    } else {
+        // Return a response to acknowledge receipt of the event
+        res.json({ received: true });
     }
-
-    res.json({ received: true });
 });
 
 export default router;
