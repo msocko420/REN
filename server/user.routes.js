@@ -132,8 +132,8 @@ router.post('/stripe-webhook', express.raw({ type: 'application/json' }), async 
     if (event.type === 'checkout.session.completed') {
         const session = event.data.object;
 
-        // Extracting user's ID from the Stripe session's metadata
-        const userId = session.metadata.userId;
+        // Extracting user's ID from the Stripe session's client_reference_id
+        const userId = session.client_reference_id;
 
         // Update the user's subscription details in the database
         const subscriptionStatus = 'ACTIVE';
