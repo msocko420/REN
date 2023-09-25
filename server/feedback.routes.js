@@ -7,15 +7,14 @@ router.post('/', async (req, res) => {
     const { name, email, message } = req.body;
 
     const transporter = nodemailer.createTransport({
-        host: 'smtp.hostinger.com',
-        port: 587,
-        secure: false,
+        host: 'smtp.titan.email',
+        port: 465,
+        secure: true, // use SSL/TLS
         auth: {
             user: 'team@kashmunkey.com',
             pass: process.env.HOSTINGER_EMAIL_PASSWORD
         }
     });
-
     try {
         await transporter.sendMail({
             from: 'team@kashmunkey.com',
