@@ -116,6 +116,12 @@ router.put('/account/update', express.json(), authenticateJWT, (req, res) => {
         res.status(200).send({ success: true, message: 'User details updated successfully.' });
     });
 });
+// Token validation endpoint
+router.post('/token/validate', express.json(), authenticateJWT, (req, res) => {
+    // If the middleware function `authenticateJWT` has successfully run, the token is valid
+    // Therefore, we just return a success response.
+    res.status(200).json({ valid: true });
+});
 
 router.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
     let event;
