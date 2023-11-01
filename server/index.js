@@ -10,13 +10,7 @@ dotenv.config();
 
 const app = express();
 const allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173/', 'https://www.kashmunkey.xyz', 'https://www.kashmunkey.com'];
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
 app.use(cors());
 
 // Attach express.json() middleware specifically to the routes that need it
