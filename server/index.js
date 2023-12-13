@@ -11,7 +11,18 @@ dotenv.config();
 const app = express();
 const allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173/', 'https://www.kashmunkey.xyz', 'https://www.kashmunkey.com'];
 
-app.use(cors());
+// Configure CORS with dynamic origin checking
+app.use(cors({
+    origin: (origin, callback) => {
+        // allow requests with no origin (like mobile apps, curl requests)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            var msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    }
+}));
 
 // Attach express.json() middleware specifically to the routes that need it
 app.use('/api/v1/dalle', express.json({ limit: "150mb" }), dalleRoutes);
