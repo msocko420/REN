@@ -28,36 +28,3 @@ app.get('/', (req, res) => {
 
 app.listen(8080, () => console.log('Server has started'));
 
-
-and this is the feedback.routes script on the server side: import express from 'express';
-import nodemailer from 'nodemailer';
-
-const router = express.Router();
-
-router.post('/', async (req, res) => {
-    const { name, email, message } = req.body;
-
-    const transporter = nodemailer.createTransport({
-        host: 'smtp.titan.email',
-        port: 465,
-        secure: true, // use SSL/TLS
-        auth: {
-            user: 'team@kashmunkey.com',
-            pass: process.env.HOSTINGER_EMAIL_PASSWORD
-        }
-    });
-    try {
-        await transporter.sendMail({
-            from: 'team@kashmunkey.com',
-            to: 'team@kashmunkey.com',
-            subject: `Feedback from ${name}`,
-            text: `Name: ${name}\nEmail: ${email}\nMessage: ${message}`
-        });
-        res.status(200).send('Feedback sent');
-    } catch (error) {
-        console.error('Error sending email', error);
-        res.status(500).send('Internal Server Error');
-    }
-});
-
-export default router;
